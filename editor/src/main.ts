@@ -54,6 +54,14 @@ function fetchJSON<T>(url: string): Promise<T> {
   });
 }
 
+function fromB64(value: string | undefined): string {
+  if (!value) return '';
+  return Buffer.from(value, 'base64').toString('utf-8');
+}
+function toB64(value: string): string {
+  return Buffer.from(value, 'utf-8').toString('base64');
+}
+
 // Fetch Wikidata item labels, descriptions, and claims
 ipcMain.handle('fetch-item', async (_event, qid: string): Promise<WikidataEntity | null> => {
   const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${qid}&props=claims|labels|descriptions&languages=en&format=json`;
@@ -103,7 +111,7 @@ ipcMain.handle('check-article', async (_event, qid: string): Promise<ArticleResu
   }
 });
 
-const PYTHON = process.platform === 'win32' ? 'py' : 'python3';
+const PYTHON = 'python3';
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 
@@ -119,9 +127,9 @@ ipcMain.handle('get-credentials', async (): Promise<{ username: string; password
       if (eq > 0) vals[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
     }
     return {
-      username: vals['WIKI_USERNAME'] || '',
-      password: vals['WIKI_PASSWORD'] || '',
-      mainPassword: vals['WIKI_MAIN_PASSWORD'] || '',
+      username: fromB64(vals['WIKI_USERNAME_B64'] || ''),
+      password: fromB64(vals['WIKI_PASSWORD_B64'] || ''),
+      mainPassword: fromB64(vals['WIKI_MAIN_PASSWORD_B64'] || ''),
     };
   } catch {
     return null;
@@ -130,7 +138,7 @@ ipcMain.handle('get-credentials', async (): Promise<{ username: string; password
 
 ipcMain.handle('save-credentials', async (_event, creds: { username: string; password: string; mainPassword: string }): Promise<boolean> => {
   try {
-    const content = `WIKI_USERNAME=${creds.username}\nWIKI_PASSWORD=${creds.password}\nWIKI_MAIN_PASSWORD=${creds.mainPassword}\n`;
+    const content = `WIKI_USERNAME_B64=${toB64(creds.username)}\nWIKI_PASSWORD_B64=${toB64(creds.password)}\nWIKI_MAIN_PASSWORD_B64=${toB64(creds.mainPassword)}\n`;
     fs.writeFileSync(ENV_PATH, content, 'utf-8');
     return true;
   } catch (e) {
